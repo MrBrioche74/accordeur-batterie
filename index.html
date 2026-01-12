@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Accordeur Batterie</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>Accordeur batterie</h1>
+    <p class="sub">Frappe un seul fût à la fois (micro proche du fût).</p>
+
+    <div class="row">
+      <label class="label">
+        Élément
+        <select id="targetSelect">
+          <option value="snare">Caisse claire</option>
+          <option value="tomHigh">Tom aigu</option>
+          <option value="tomMid">Tom medium</option>
+          <option value="tomLow">Tom basse</option>
+        </select>
+      </label>
+
+      <button id="btnToggle">Démarrer</button>
+      <span id="status" class="pill">⏹️ arrêté</span>
+    </div>
+
+    <section class="readout">
+      <div class="big" id="result">—</div>
+      <div class="small">
+        <span id="freq">0.0 Hz</span>
+        <span>•</span>
+        <span id="range">plage: —</span>
+      </div>
+
+      <div class="meter">
+        <div class="band" id="band"></div>
+        <div class="needle" id="needle"></div>
+        <div class="tick"></div>
+      </div>
+
+      <p class="hint" id="hint">
+        Appuie sur “Démarrer”, accepte le micro, puis frappe le fût (1 coup).
+      </p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
