@@ -1,14 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <defs>
-    <radialGradient id="g" cx="30%" cy="20%" r="90%">
-      <stop offset="0%" stop-color="#7b5cff"/>
-      <stop offset="55%" stop-color="#0ad7ff" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#0b1020"/>
+    <!-- Dégradé principal -->
+    <radialGradient id="bg" cx="30%" cy="25%" r="85%">
+      <stop offset="0%" stop-color="#7B5CFF"/>
+      <stop offset="55%" stop-color="#00D4FF"/>
+      <stop offset="100%" stop-color="#0B1020"/>
     </radialGradient>
+
+    <!-- Ombre douce -->
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
   </defs>
-  <rect width="256" height="256" rx="56" fill="url(#g)"/>
-  <rect x="58" y="82" width="140" height="100" rx="18" fill="none" stroke="white" stroke-width="10" opacity="0.92"/>
-  <path d="M54 86h148" stroke="white" stroke-width="10" opacity="0.92"/>
-  <path d="M92 84l-22-22" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.92"/>
-  <path d="M164 84l22-22" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.92"/>
+
+  <!-- Cercle badge -->
+  <circle cx="128" cy="128" r="120" fill="url(#bg)" filter="url(#softShadow)"/>
+
+  <!-- Batterie stylisée -->
+  <g stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.95">
+    <!-- Fût principal -->
+    <rect x="64" y="98" width="128" height="76" rx="18"/>
+
+    <!-- Peau -->
+    <line x1="60" y1="98" x2="196" y2="98"/>
+
+    <!-- Pieds -->
+    <line x1="84" y1="176" x2="72" y2="196"/>
+    <line x1="172" y1="176" x2="184" y2="196"/>
+
+    <!-- Baguettes -->
+    <line x1="88" y1="92" x2="56" y2="60"/>
+    <line x1="168" y1="92" x2="200" y2="60"/>
+  </g>
 </svg>
