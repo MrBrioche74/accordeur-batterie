@@ -1,65 +1,114 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Accordeur Batterie</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- (Optionnel) Si tu ajoutes un apple-touch-icon plus tard :
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  -->
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="card">
-    <h1>Accordeur batterie</h1>
-    <p class="sub">Frappe un seul fût à la fois (micro proche du fût).</p>
-
-    <div class="row">
-      <label class="label">
-        Style
-        <select id="styleSelect">
-          <option value="tight" selected>Tendu</option>
-          <option value="rock">Rock</option>
-        </select>
-      </label>
-
-      <label class="label">
-        Peau
-        <select id="skinSelect">
-          <option value="batter" selected>Peau de frappe</option>
-          <option value="reso">Peau de résonance</option>
-        </select>
-      </label>
-
-      <label class="label">
-        Élément
-        <select id="targetSelect">
-          <option value="snare">Caisse claire (14")</option>
-          <option value="tomHigh">Tom aigu (10")</option>
-          <option value="tomMid">Tom medium (12")</option>
-          <option value="tomLow">Tom basse (14")</option>
-        </select>
-      </label>
-
-      <button id="btnToggle">Démarrer</button>
-      <span id="status" class="pill">⏹️ arrêté</span>
-    </div>
-
-    <section class="readout">
-      <div class="big" id="result">—</div>
-      <div class="small">
-        <span id="freq">0.0 Hz</span>
-        <span>•</span>
-        <span id="range">plage: —</span>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <!-- petit pictogramme batterie en SVG -->
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M7 7h10l-1 10H8L7 7Z" stroke="currentColor" stroke-width="1.6" />
+            <path d="M6 7h12" stroke="currentColor" stroke-width="1.6" />
+            <path d="M9 7l-2-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M15 7l2-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="title">Accordeur batterie</div>
+          <div class="subtitle">Micro proche • 1 coup • analyse automatique</div>
+        </div>
       </div>
 
-      <div class="meter">
-        <div class="band" id="band"></div>
-        <div class="needle" id="needle"></div>
-        <div class="tick"></div>
+      <div class="actions">
+        <button id="btnTheme" class="iconBtn" title="Basculer sombre/clair" aria-label="Basculer sombre/clair">
+          <span class="icon">🌓</span>
+        </button>
+        <button id="btnFull" class="iconBtn" title="Plein écran" aria-label="Plein écran">
+          <span class="icon">⛶</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="controls">
+        <label class="field">
+          <span class="label"><span class="emoji">🎛️</span> Style</span>
+          <select id="styleSelect">
+            <option value="tight" selected>Tendu</option>
+            <option value="rock">Rock</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="label"><span class="emoji">🥁</span> Peau</span>
+          <select id="skinSelect">
+            <option value="batter" selected>Frappe</option>
+            <option value="reso">Résonance</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="label"><span class="emoji">🎯</span> Élément</span>
+          <select id="targetSelect">
+            <option value="snare">Caisse claire (14")</option>
+            <option value="tomHigh">Tom aigu (10")</option>
+            <option value="tomMid">Tom medium (12")</option>
+            <option value="tomLow">Tom basse (14")</option>
+          </select>
+        </label>
+
+        <div class="startWrap">
+          <button id="btnToggle" class="primary">Démarrer</button>
+          <span id="status" class="pill">⏹️ arrêté</span>
+        </div>
       </div>
 
-      <p class="hint" id="hint">
-        Appuie sur “Démarrer”, accepte le micro, puis frappe le fût (1 coup).
-      </p>
+      <div class="readout">
+        <div class="headline" id="result">—</div>
+
+        <div class="meta">
+          <div class="metaItem"><span class="k">Hz</span> <span id="freq">0.0</span></div>
+          <div class="dot">•</div>
+          <div class="metaItem"><span class="k">plage</span> <span id="range">—</span></div>
+        </div>
+
+        <!-- METER PRO -->
+        <div class="meterPro" aria-label="Indicateur de fréquence">
+          <div class="band" id="band"></div>
+          <div class="needle" id="needle"></div>
+          <div class="centerLine"></div>
+          <div class="scale">
+            <span>40</span><span>80</span><span>120</span><span>160</span><span>200</span><span>240</span><span>280</span>
+          </div>
+        </div>
+
+        <div class="hintRow">
+          <div class="hint" id="hint">Appuie sur “Démarrer”, accepte le micro, puis frappe (1 coup).</div>
+          <div class="badge" id="badge">—</div>
+        </div>
+      </div>
     </section>
+
+    <footer class="footer">
+      <span>Astuce : accorde d’abord <b>Frappe</b>, puis <b>Résonance</b> un peu plus haut.</span>
+    </footer>
   </main>
 
   <script src="app.js"></script>
