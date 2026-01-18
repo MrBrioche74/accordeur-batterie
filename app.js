@@ -261,8 +261,8 @@ function updateUI(freq, presetLabel, targetLabel, band) {
   needleTargetPct = clamp01(x);
 
   let status, badge;
-  if (freq < band.min) { status = "⬇ trop bas"; badge = "Détendre"; }
-  else if (freq > band.max) { status = "⬆ trop haut"; badge = "Serrer"; }
+  if (freq < band.min) { status = "⬇ trop bas"; badge = "Serrer"; }
+  else if (freq > band.max) { status = "⬆ trop haut"; badge = "Détendre"; }
   else { status = "✅ OK"; badge = "Bon"; }
 
   el.result.textContent = `${presetLabel} • ${targetLabel} : ${status}`;
@@ -293,3 +293,4 @@ function animateNeedle(){
 }
 
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+
