@@ -1,13 +1,9 @@
 /* =========================================================
-   ACCORDEUR BATTERIE (WEB)
-   Kit : CC 14" / Tom 10" / Tom 12" / Floor 14"
-   Sélecteurs : Style (Tendu / Rock) + Peau (Frappe / Réso)
-   Tech : détection de frappe + FFT + pic spectral
+   ACCORDEUR BATTERIE (WEB) — Style + Peau + UI++ + PWA
    ========================================================= */
 
 // ---------- PRESETS ----------
 const PRESETS = {
-  // Son tendu : plus haut, attaque très nette
   tight: {
     label: "Tendu",
     targets: {
@@ -17,8 +13,6 @@ const PRESETS = {
       tomLow:  { label: 'Tom basse (14")',     batter: { min: 95,  max: 130 }, reso: { min: 110, max: 145 } },
     }
   },
-
-  // Rock : plus bas, plus de “corps”, descente évidente
   rock: {
     label: "Rock",
     targets: {
@@ -43,10 +37,46 @@ const el = {
   freq:   document.getElementById("freq"),
   range:  document.getElementById("range"),
   hint:   document.getElementById("hint"),
+  badge:  document.getElementById("badge"),
 
   needle: document.getElementById("needle"),
   band:   document.getElementById("band"),
+
+  theme:  document.getElementById("btnTheme"),
+  full:   document.getElementById("btnFull"),
 };
+
+// ---------- THEME (dark/light) ----------
+initTheme();
+el.theme.addEventListener("click", toggleTheme);
+
+function initTheme(){
+  const saved = localStorage.getItem("theme");
+  if (saved === "light" || saved === "dark") {
+    document.documentElement.setAttribute("data-theme", saved);
+  }
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("theme", next);
+}
+
+// ---------- FULLSCREEN ----------
+el.full.addEventListener("click", async () => {
+  try {
+    if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+    else await document.exitFullscreen();
+  } catch {
+    // iOS Safari ne supporte pas le vrai fullscreen; pas grave
+  }
+});
+
+// ---------- PWA (offline) ----------
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
 
 // ---------- AUDIO ----------
 let audioCtx = null;
@@ -55,40 +85,41 @@ let source = null;
 let stream = null;
 let rafId = null;
 
-// ---------- DSP PARAMS ----------
-const FFT_SIZE = 16384;        // résolution basse fréquence
+// ---------- DSP ----------
+const FFT_SIZE = 16384;
 const TIME_BUF = 2048;
 
-const MIN_FREQ_VIEW = 40;      // affichage meter
-const MAX_FREQ_VIEW = 300;
+const MIN_FREQ_VIEW = 40;
+const MAX_FREQ_VIEW = 280; // correspond à l’échelle affichée
 
 const HIT_RMS_THRESHOLD = 0.035;
 const HIT_RISE_FACTOR = 1.8;
 
-const HOLD_MS = 250;           // anti double-détection
-const POST_HIT_DELAY_MS = 45;  // attendre après l’attaque
-const AVG_SPECTRA = 4;         // moyenne de spectres
+const HOLD_MS = 260;
+const POST_HIT_DELAY_MS = 45;
+const AVG_SPECTRA = 4;
 
 let baselineRms = 0;
 let lastHitAt = 0;
 
+// Aiguille “smooth”
+let needleTargetPct = 0.5;
+let needlePct = 0.5;
+
 // ---------- EVENTS ----------
 el.btn.addEventListener("click", async () => (audioCtx ? stop() : await start()));
-el.style.addEventListener("change", () => { updateRangeUI(); });
-el.skin.addEventListener("change", () => { updateRangeUI(); });
-el.target.addEventListener("change", () => { updateRangeUI(); });
+el.style.addEventListener("change", updateRangeUI);
+el.skin.addEventListener("change", updateRangeUI);
+el.target.addEventListener("change", updateRangeUI);
 
 updateRangeUI();
+animateNeedle();
 
 // ---------- START / STOP ----------
 async function start() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      }
+      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
     });
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -106,12 +137,13 @@ async function start() {
 
     el.status.textContent = "🎤 micro actif";
     el.btn.textContent = "Arrêter";
-    el.hint.textContent = "Frappe 1 coup. Attends l’analyse, puis refrappe.";
+    el.badge.textContent = "En écoute…";
+    el.badge.style.opacity = "1";
 
     loop();
   } catch (e) {
     console.error(e);
-    el.hint.textContent = "Micro impossible. Sur iPhone, HTTPS + autorisation micro obligatoires.";
+    el.hint.textContent = "Micro impossible. Sur iPhone : HTTPS + autoriser le micro.";
     stop();
   }
 }
@@ -135,9 +167,9 @@ function stop() {
   el.status.textContent = "⏹️ arrêté";
   el.btn.textContent = "Démarrer";
   el.result.textContent = "—";
-  el.freq.textContent = "0.0 Hz";
-  el.needle.style.left = "50%";
-  el.hint.textContent = "Appuie sur “Démarrer”, accepte le micro, puis frappe le fût (1 coup).";
+  el.freq.textContent = "0.0";
+  el.badge.textContent = "—";
+  needleTargetPct = 0.5;
 }
 
 // ---------- MAIN LOOP ----------
@@ -148,8 +180,6 @@ function loop() {
   analyser.getFloatTimeDomainData(timeBuf);
 
   const rms = Math.sqrt(timeBuf.reduce((s, v) => s + v*v, 0) / timeBuf.length);
-
-  // baseline RMS (bruit ambiant)
   baselineRms = baselineRms === 0 ? rms : (0.98 * baselineRms + 0.02 * rms);
 
   const now = performance.now();
@@ -162,26 +192,27 @@ function loop() {
 
   if (isHit) {
     lastHitAt = now;
+    el.badge.textContent = "Analyse…";
     setTimeout(analyzeSpectrumOnce, POST_HIT_DELAY_MS);
   }
 
   rafId = requestAnimationFrame(loop);
 }
 
-// ---------- SPECTRUM ANALYSIS ----------
+// ---------- SPECTRUM ----------
 function analyzeSpectrumOnce() {
   if (!analyser || !audioCtx) return;
 
   const preset = PRESETS[el.style.value];
   const targetObj = preset.targets[el.target.value];
-  const band = targetObj[el.skin.value]; // batter/reso
+  const band = targetObj[el.skin.value];
 
   const specLen = analyser.frequencyBinCount;
   const tmp = new Float32Array(specLen);
   const acc = new Float32Array(specLen);
 
   for (let k = 0; k < AVG_SPECTRA; k++) {
-    analyser.getFloatFrequencyData(tmp); // dB (valeurs négatives)
+    analyser.getFloatFrequencyData(tmp);
     for (let i = 0; i < specLen; i++) acc[i] += tmp[i];
   }
   for (let i = 0; i < specLen; i++) acc[i] /= AVG_SPECTRA;
@@ -190,12 +221,11 @@ function analyzeSpectrumOnce() {
   const searchMax = band.max + 100;
 
   const peakHz = findPeakHz(acc, audioCtx.sampleRate, analyser.fftSize, searchMin, searchMax);
-  if (!peakHz) return;
+  if (!peakHz) { el.badge.textContent = "Réessaie"; return; }
 
   updateUI(peakHz, preset.label, targetObj.label, band);
 }
 
-// Trouve le pic spectral dans une plage, avec une petite interpolation
 function findPeakHz(dbSpectrum, sampleRate, fftSize, minHz, maxHz) {
   const binHz = sampleRate / fftSize;
   const start = Math.max(1, Math.floor(minHz / binHz));
@@ -211,7 +241,7 @@ function findPeakHz(dbSpectrum, sampleRate, fftSize, minHz, maxHz) {
   }
   if (bestI < 1) return null;
 
-  // interpolation "centre de gravité" sur i-1,i,i+1 (dB->amplitude approx)
+  // interpolation i-1, i, i+1
   const i0 = bestI - 1, i1 = bestI, i2 = bestI + 1;
   const a0 = Math.pow(10, dbSpectrum[i0] / 20);
   const a1 = Math.pow(10, dbSpectrum[i1] / 20);
@@ -222,20 +252,21 @@ function findPeakHz(dbSpectrum, sampleRate, fftSize, minHz, maxHz) {
   return frac * binHz;
 }
 
-// ---------- UI ----------
+// ---------- UI UPDATE ----------
 function updateUI(freq, presetLabel, targetLabel, band) {
-  el.freq.textContent = `${freq.toFixed(1)} Hz`;
+  el.freq.textContent = freq.toFixed(1);
 
-  // needle position in viewport
+  // needle target
   const x = (freq - MIN_FREQ_VIEW) / (MAX_FREQ_VIEW - MIN_FREQ_VIEW);
-  el.needle.style.left = `${clamp01(x) * 100}%`;
+  needleTargetPct = clamp01(x);
 
-  let status;
-  if (freq < band.min) status = "⬇ trop bas";
-  else if (freq > band.max) status = "⬆ trop haut";
-  else status = "✅ OK";
+  let status, badge;
+  if (freq < band.min) { status = "⬇ trop bas"; badge = "Détendre"; }
+  else if (freq > band.max) { status = "⬆ trop haut"; badge = "Serrer"; }
+  else { status = "✅ OK"; badge = "Bon"; }
 
   el.result.textContent = `${presetLabel} • ${targetLabel} : ${status}`;
+  el.badge.textContent = badge;
 }
 
 function updateRangeUI() {
@@ -243,19 +274,22 @@ function updateRangeUI() {
   const targetObj = preset.targets[el.target.value];
   const band = targetObj[el.skin.value];
 
-  el.range.textContent = `plage: ${band.min}–${band.max} Hz`;
+  el.range.textContent = `${band.min}–${band.max} Hz`;
 
-  // zone visuelle (band) dans le meter
   const left = (band.min - MIN_FREQ_VIEW) / (MAX_FREQ_VIEW - MIN_FREQ_VIEW);
   const right = (band.max - MIN_FREQ_VIEW) / (MAX_FREQ_VIEW - MIN_FREQ_VIEW);
   el.band.style.left = `${clamp01(left) * 100}%`;
   el.band.style.width = `${Math.max(2, (clamp01(right) - clamp01(left)) * 100)}%`;
 
-  // petit rappel dans le hint
   const skinLabel = el.skin.value === "batter" ? "frappe" : "résonance";
   el.hint.textContent = `Style: ${preset.label} • Peau: ${skinLabel}. Frappe 1 coup (micro proche).`;
 }
 
-function clamp01(v) {
-  return Math.max(0, Math.min(1, v));
+// animation douce de l’aiguille (même si la mesure saute un peu)
+function animateNeedle(){
+  needlePct += (needleTargetPct - needlePct) * 0.18; // lissage
+  el.needle.style.left = `${needlePct * 100}%`;
+  requestAnimationFrame(animateNeedle);
 }
+
+function clamp01(v){ return Math.max(0, Math.min(1, v)); }
